@@ -7,7 +7,7 @@ def _protected_exp(x):
     try:
         return np.exp(x)
     except OverflowError:
-        return 0.
+        return np.inf
 
 
 def _protected_mul(x1, x2):
@@ -19,7 +19,7 @@ def _protected_mul(x1, x2):
 def _protected_division(x1, x2):
     """Closure of division (x1/x2) for zero denominator."""
     with np.errstate(divide='ignore', invalid='ignore'):
-        return np.where(np.abs(x2) > 1e-4, np.divide(x1, x2), np.sign(x1)*np.sign(x2)*10**3)
+        return np.where(np.abs(x2) > 1e-4, np.divide(x1, x2), np.inf)
 
 
 def _protected_sqrt(x1):
@@ -30,13 +30,13 @@ def _protected_sqrt(x1):
 def _protected_log(x1):
     """Closure of log for zero arguments."""
     with np.errstate(divide='ignore', invalid='ignore'):
-        return np.where(x1 > 1e-4, np.log(x1), 0.)
+        return np.where(x1 > 1e-4, np.log(x1), np.inf)
 
 
 def _protected_inverse(x1):
     """Closure of inverse for zero arguments."""
     with np.errstate(divide='ignore', invalid='ignore'):
-        return np.where(np.abs(x1) > 1e-4, 1. / x1, np.sign(x1)*10**3)
+        return np.where(np.abs(x1) > 1e-4, 1. / x1, np.inf)
 
 
 def _protected_pow(x1, x2):
@@ -45,11 +45,11 @@ def _protected_pow(x1, x2):
         try:
             return np.power(x1, x2)
         except OverflowError:
-            return 0.
+            return np.inf
         except ValueError:  # The math domain error
-            return 0.
+            return np.inf
         except RuntimeWarning:
-            return 0.
+            return np.inf
 
 
 def _sigmoid(x1):
