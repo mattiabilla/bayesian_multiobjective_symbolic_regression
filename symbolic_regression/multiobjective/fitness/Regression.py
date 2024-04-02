@@ -268,6 +268,61 @@ class WMSEAkaike(BaseFitness):
             return np.inf
         except NameError:
             return np.inf
+            
+
+class WMSEBIC(BaseFitness):
+
+    def __init__(self, data: pd.DataFrame = None, **kwargs) -> None:
+        """ This fitness requires the following arguments:
+
+        - target: str
+        - weights: str
+
+        """
+        super().__init__(**kwargs)
+        self.data = data
+        
+
+    def evaluate(self, program, data: pd.DataFrame, validation: bool = False, pred=None) -> float:
+        # if data was previously provided ignore data coming from the regressor
+        if self.data is not None:
+            data = self.data
+            
+        if pred is None:
+            if not program.is_valid:
+                return np.nan
+
+            if not validation:
+                program = self.optimize(program=program, data=data)
+
+            program_to_evaluate = program.to_logistic(
+                inplace=False) if self.logistic else program
+
+            pred = program_to_evaluate.evaluate(data=data)
+
+        if np.isnan(pred).any():
+            return np.inf
+
+        try:
+            k = len(program_to_evaluate.get_constants())
+
+            if self.weights is not None:
+                WMSE = (((pred - data[self.target])**2)
+                        * data[self.weights]).mean()
+            else:
+                WMSE = ((pred - data[self.target])**2).mean()
+
+            NLL = len(data[self.target]) / 2 * (1 + np.log(WMSE))
+
+            BIC = (np.log(len(data[self.target])) * k) + (2 * NLL)
+            return BIC
+
+        except TypeError:
+            return np.inf
+        except ValueError:
+            return np.inf
+        except NameError:
+            return np.inf
 
 
 class RegressionMinimumDescriptionLength(BaseFitness):
