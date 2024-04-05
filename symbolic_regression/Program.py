@@ -1,6 +1,7 @@
 import copy
 import logging
 import random
+import signal
 from typing import Dict, List, Tuple, Union
 
 import numpy as np
@@ -99,6 +100,7 @@ class Program:
         self._is_duplicated: bool = False
         self._program_depth: int = 0
         self._complexity: int = 0
+        self._exclusive_hypervolume: float = np.nan
 
         # Pareto Front Attributes
         self.rank: int = np.inf
@@ -200,6 +202,16 @@ class Program:
     @all_operations.getter
     def all_operations(self):
         return self.program._get_all_operations(all_operations=[])
+
+    @property
+    def exclusive_hypervolume(self):
+        """ This allow to get the exclusive hypervolume of the program
+        """
+        return self._exclusive_hypervolume
+
+    @exclusive_hypervolume.setter
+    def exclusive_hypervolume(self, value):
+        self._exclusive_hypervolume = value
 
     @property
     def features_used(self):
@@ -844,15 +856,31 @@ class Program:
         """
         if not constants_optimization or not self.is_valid:
             return self
-
+        
         task = constants_optimization_conf['task']
+        n_constants = len(self.get_constants(return_objects=False))
+        n_features_used = len(self.features_used)
+        
+        if n_constants > 100:
+            logging.debug('Program has more than 100 constants. Optimizing using ADAM')
+            constants_optimization = 'ADAM'
+            constants_optimization_conf = {
+                'task': task,
+                'learning_rate': 1e-4,
+                'batch_size': int(np.ceil(len(data)/10)),
+                'epochs': 200,
+                'verbose': 0,
+                'gradient_clip': False,
+                'beta_1': 0.9,
+                'beta_2': 0.999,
+                'epsilon': 1e-7,
+                'l1_param': 0,
+                'l2_param': 0,
+            }
 
         if task not in ['regression:wmse', 'regression:wrrmse', 'regression:cox', 'binary:logistic']:
             raise AttributeError(
                 f'Task supported are regression:wmse, regression:wrrmse, regression:cox or binary:logistic')
-
-        n_constants = len(self.get_constants(return_objects=False))
-        n_features_used = len(self.features_used)
 
         if not isinstance(self.program, FeatureNode) and n_constants > 0 and n_features_used > 0:
             ''' Rationale for the conditions:
@@ -889,6 +917,16 @@ class Program:
 
             to_optimize = self if inplace else copy.deepcopy(self)
 
+            def handler(signum, frame):
+                raise TimeoutError("Operation timed out")
+            
+            class TimeoutError(Exception):
+                def __str__(self):
+                    return ""
+            
+            signal.signal(signal.SIGALRM, handler)
+            signal.alarm(60)
+
             try:
                 final_parameters, _, _ = f_opt(
                     program=to_optimize,
@@ -901,6 +939,10 @@ class Program:
                 )
             except NameError:
                 return to_optimize
+            except TimeoutError:
+                return to_optimize
+            finally:
+                signal.alarm(0)
 
             if len(final_parameters) > 0:
                 to_optimize.set_constants(new=final_parameters)
