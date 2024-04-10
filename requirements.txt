@@ -1,9 +1,11 @@
+arviz
 astropy
 loky
 matplotlib
 numpy
 pandas
 plotly
+pymc
 pymoo
 pytexit
 scikit-learn

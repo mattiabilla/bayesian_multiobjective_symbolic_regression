@@ -7,8 +7,13 @@ from typing import Dict, List, Tuple, Union
 import numpy as np
 import pandas as pd
 import sympy
+from sympy import lambdify
+from sympy.utilities.iterables import ordered
 from joblib import Parallel, delayed
 from pytexit import py2tex
+
+import pymc as pm
+import arviz as az
 
 from symbolic_regression.multiobjective.fitness.Base import BaseFitness
 from symbolic_regression.multiobjective.hypervolume import _HyperVolume
@@ -1644,3 +1649,124 @@ class Program:
                       parsimony_decay=self.parsimony_decay)
 
         return new
+        
+    def _num2symbols(self, expr_str):
+        """ This method returns the symbolic expression of the program
+
+        The constants will be replaced with a vector of variables
+
+        Args:
+            - expr_str: str
+                The expression string to convert.
+
+        Returns:
+            - dict
+                The replacement dictionary
+            - Sympy
+
+            - int
+
+        """
+        
+        expr = sympy.core.sympify(expr_str)
+        # wild symbol to select all numbers
+        w = sympy.Wild("w", properties=[lambda t: isinstance(t, sympy.Float)])
+
+        # extract the numbers from the expression
+        n = expr.find(w)
+
+        # create a symbol for each number
+        c = sympy.IndexedBase("C", shape=(len(n)))
+
+        # create a dictionary mapping a number to a symbol
+        d = {k: v for k, v in zip(n,c)}
+
+        return d, expr.subs(d), len(n)
+
+    def _get_lamb_expr(self):
+        mle_d, new_expr, n_const = self._num2symbols(self.program.render())
+        sym=tuple(ordered(new_expr.atoms(sympy.Symbol)))
+        sym_list = [str(s) for s in sym if str(s)!="C"]
+        sym = ["C"]+sym_list
+        
+        l_expr = lambdify(sym, new_expr, 'numpy')
+        
+        return l_expr, sym_list, mle_d, n_const
+    
+
+    def sample(self, data: Union[dict, pd.Series, pd.DataFrame], target: str, draws=1000, chains=2, beta=1, seed=42):
+        l_expr, sym_list, mle_d, n_const = self._get_lamb_expr()
+        self.lamb_expr = l_expr
+
+        mle_values = [k for k in mle_d]
+        self.mle_const = np.array(mle_values).astype(float)
+        
+        X_train = data[sym_list].to_numpy()
+        y_train = data[target].to_numpy()
+
+        coords = {
+                "train_cols": np.arange(X_train.shape[1]),
+                "obs_id": np.arange(X_train.shape[0]),
+        }
+
+        self.prob_mod = pm.Model()
+
+        with self.prob_mod:
+            self.prob_mod.add_coord('coords', coords, mutable = True)
+            nl_input = pm.Data("nl_input", X_train, mutable=True, dims=("obs_id", "train_cols"))
+            #nl_output = pm.Data("nl_output", Y_train, mutable=True, dims="obs_id")
+
+
+            # Priors for unknown model parameters
+            #alpha = pm.Uniform("alpha", lower=min([-1, alpha_init.min()]), upper=max([+1, alpha_init.max()]), shape=n_const)
+            alpha = pm.Normal("alpha", mu=self.mle_const, sigma=10, shape=n_const)
+
+            sigma = pm.HalfNormal("sigma", sigma=5)
+
+
+            list_input = [nl_input[:,i] for i in range(nl_input.get_value().shape[1])]
+
+            #mu = pm.Deterministic("out", self.lamb_expr(alpha, *list_input))
+            #print(mu.shape)
+            mu =  self.lamb_expr(alpha, *list_input)
+            
+            
+
+            def normal_logp(value, mu, sigma):
+                #return pm.Normal("out").logp(mu, sigma, value)*beta
+                #pm.Normal("out", mu, sigma)
+                return pm.logp(pm.Normal.dist(mu, sigma), value)*beta
+                
+            def random(mu, sigma, rng=None, size=None):
+                return rng.normal(loc=mu, scale=sigma, size=size)
+
+			# Likelihood (sampling distribution) of observations
+			#Y_obs = pm.Normal("out", mu=mu, sigma=sigma, observed=y_train, shape=mu.shape)
+            #llike = pm.Potential("llike", normal_logp(y_train, mu, sigma))	
+
+            
+            # Likelihood (sampling distribution) of observations
+            #Y_obs = pm.Normal("out", mu=mu, sigma=sigma, shape=mu.shape, observed=y_train)
+            custom = pm.DensityDist('out',
+                        mu,
+                        sigma,
+                        logp=normal_logp,
+                        random=random,
+                        observed=y_train)
+            
+            self.trace = pm.sample(draws, chains=chains, init="adapt_diag", random_seed=seed, target_accept=0.9)
+
+
+    def ppc(self, data: Union[dict, pd.Series, pd.DataFrame]):
+        l_expr, sym_list, mle_d, n_const = self._get_lamb_expr()
+        X_test = data[sym_list].to_numpy()
+        test_coords={
+            "train_cols": np.arange(X_test.shape[1]),
+            "obs_id": np.arange(X_test.shape[0]),
+        }
+
+        with self.prob_mod:
+            pm.set_data(new_data={"nl_input": X_test}, coords=test_coords)
+            ppc = pm.sample_posterior_predictive(self.trace)
+
+        return ppc
