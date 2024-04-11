@@ -1788,13 +1788,15 @@ class Program:
     def pps(self, data: Union[dict, pd.Series, pd.DataFrame]):
         l_expr, sym_list, mle_d, n_const = self._get_lamb_expr()
         X_test = data[sym_list].to_numpy()
+        y_dummy = np.zeros(X_test.shape[0])
+        
         test_coords={
             "train_cols": np.arange(X_test.shape[1]),
             "obs_id": np.arange(X_test.shape[0]),
         }
 
         with self.prob_mod:
-            pm.set_data(new_data={"nl_input": X_test}, coords=test_coords)
+            pm.set_data(new_data={"nl_input": X_test, "nl_output": y_dummy}, coords=test_coords)
             ppc = pm.sample_posterior_predictive(self.trace, predictions=True)
 
         return ppc
