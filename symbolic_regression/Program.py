@@ -14,8 +14,11 @@ from pytexit import py2tex
 
 import arviz as az
 import pymc as pm
+from pymc_experimental.utils.prior import prior_from_idata
 from pymc.distributions import Interpolated
 from scipy import stats
+from scipy.stats import norm, lognorm
+
 
 from symbolic_regression.multiobjective.fitness.Base import BaseFitness
 from symbolic_regression.multiobjective.hypervolume import _HyperVolume
@@ -1730,12 +1733,10 @@ class Program:
                 #alpha = pm.Normal("alpha", mu=self.mle_const, sigma=10, shape=n_const)
                 sigma = pm.HalfNormal("sigma", sigma=5)
             else:
-                alpha = []
-                for i in range(n_const):
-                    #alpha.append(self._from_posterior(f"alpha{i}", az.extract(trace, var_names=f"alpha{i}")[i]))
-                    alpha.append(self._from_posterior(f"alpha{i}", az.extract(trace, var_names=f"alpha{i}")))
                 
-                sigma = self._from_posterior("sigma", az.extract(trace, var_names="sigma"))
+                priors = prior_from_idata(trace, var_names=[ f"alpha{i}" for i in range(n_const)]+["sigma"])
+                alpha = [ priors[f"alpha{i}"] for i in range(n_const) ]
+                sigma = priors["sigma"]
 
 
             list_input = [nl_input[:,i] for i in range(nl_input.get_value().shape[1])]
@@ -1812,3 +1813,4 @@ class Program:
         x = np.concatenate([[x[0] - 3 * width], x, [x[-1] + 3 * width]])
         y = np.concatenate([[0], y, [0]])
         return Interpolated(param, x, y)
+        
