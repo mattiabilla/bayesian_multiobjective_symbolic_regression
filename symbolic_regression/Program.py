@@ -1702,12 +1702,16 @@ class Program:
         return l_expr, sym_list, mle_d, n_const
     
 
-    def sample(self, data: Union[dict, pd.Series, pd.DataFrame], target: str, draws=1000, chains=2, beta=1, trace=None, seed=42):
+    def sample(self, data: Union[dict, pd.Series, pd.DataFrame], target: str, draws=1000, chains=2, beta=1, trace=None, mu=None, sd=None, seed=42):
         l_expr, sym_list, mle_d, n_const = self._get_lamb_expr()
         self.lamb_expr = l_expr
 
         mle_values = [k for k in mle_d]
         self.mle_const = np.array(mle_values).astype(float)
+        if mu is not None:
+            self.mle_const = mu
+        if sd is None:
+            sd=[10]*n_const
         
         X_train = data[sym_list].to_numpy()
         y_train = data[target].to_numpy()
@@ -1729,9 +1733,9 @@ class Program:
             if trace is None:
                 alpha = []
                 for i in range(n_const):
-                    alpha.append(pm.Normal(f"alpha{i}", mu=self.mle_const[i], sigma=10))
+                    alpha.append(pm.Normal(f"alpha{i}", mu=self.mle_const[i], sigma=sd[i]))
                 #alpha = pm.Normal("alpha", mu=self.mle_const, sigma=10, shape=n_const)
-                sigma = pm.HalfNormal("sigma", sigma=5)
+                sigma = pm.InverseGamma("sigma", alpha=2, beta=1)
             else:
                 
                 priors = prior_from_idata(trace, var_names=[ f"alpha{i}" for i in range(n_const)]+["sigma"])
