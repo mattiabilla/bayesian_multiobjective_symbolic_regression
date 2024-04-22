@@ -1679,12 +1679,13 @@ class Program:
 
         """
         
-        expr = sympy.core.sympify(expr_str)
+        expr = sympy.parsing.sympy_parser.parse_expr(expr_str, evaluate=False)
         # wild symbol to select all numbers
         w = sympy.Wild("w", properties=[lambda t: isinstance(t, sympy.Float)])
 
         # extract the numbers from the expression
-        n = expr.find(w)
+        query = sympy.core.basic._make_find_query(w)
+        n = list(filter(query, sympy.preorder_traversal(expr)))
 
         # create a symbol for each number
         c = sympy.IndexedBase("C", shape=(len(n)))
