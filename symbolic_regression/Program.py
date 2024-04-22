@@ -823,7 +823,8 @@ class Program:
                  constants_optimization: str,
                  constants_optimization_conf: dict,
                  bootstrap: bool = False,
-                 inplace: bool = False) -> 'Program':
+                 inplace: bool = False,
+                 affine: bool = False) -> 'Program':
         """ This method allow to optimize the constants of a program.
 
         The optimization of constants consists of executing a gradient descent strategy on the constants
@@ -863,6 +864,8 @@ class Program:
                 If True, the constants will be optimized using bootstrapping
             - inplace: bool  (default=False)
                 If True, the method will modify the program in place, otherwise it will return a new program
+            - affine: bool  (default=False)
+                If True, the method will optimize an affine version of the program between the target maximum and minimum
 
         Returns:
             - Program
@@ -910,24 +913,23 @@ class Program:
             '''
             if constants_optimization == 'SGD':
                 f_opt = SGD
-                self.to_affine(data=data, target=target, inplace=True)
 
             elif constants_optimization == 'ADAM':
                 f_opt = ADAM
-                self.to_affine(data=data, target=target, inplace=True)
 
             elif constants_optimization == 'ADAM2FOLD':
                 # Here there can be more than one target so need the index
                 f_opt = ADAM2FOLD
-                self.to_affine(data=data, target=target[0], inplace=True)
 
             elif constants_optimization == 'scipy':
                 f_opt = SCIPY
-                self.to_affine(data=data, target=target, inplace=True)
 
             else:
                 raise AttributeError(
                     f'Constants optimization method {constants_optimization} not supported')
+            
+            if affine:
+                self.to_affine(data=data, target=target, inplace=True)
 
             to_optimize = self if inplace else copy.deepcopy(self)
 
