@@ -14,7 +14,7 @@ from pytexit import py2tex
 
 import arviz as az
 import pymc as pm
-from pymc_experimental.utils.prior import prior_from_idata
+from pymc_experimental.utils.prior import prior_from_idata, _flatten, _parse_args
 from pymc.distributions import Interpolated
 from scipy import stats
 from scipy.stats import norm, lognorm
@@ -129,6 +129,7 @@ class Program:
         
         
         self.trace = None
+        self.cov_prior = None
 
         if program:
             self.program: Node = program
@@ -1737,7 +1738,10 @@ class Program:
                 #alpha = pm.Normal("alpha", mu=self.mle_const, sigma=10, shape=n_const)
                 sigma = pm.InverseGamma("sigma", alpha=2, beta=1)
             else:
-                
+                param_cfg = _parse_args(var_names=[ f"alpha{i}" for i in range(n_const)]+["sigma"])
+                flat_info = _flatten(trace, **param_cfg)
+                flat_array = flat_info["data"]
+                self.cov_prior = np.cov(flat_array, rowvar=False) 
                 priors = prior_from_idata(trace, var_names=[ f"alpha{i}" for i in range(n_const)]+["sigma"])
                 alpha = [ priors[f"alpha{i}"] for i in range(n_const) ]
                 sigma = priors["sigma"]
