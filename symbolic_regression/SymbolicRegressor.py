@@ -5,6 +5,7 @@ import logging
 import multiprocessing
 import os
 import pickle
+import cloudpickle
 import random
 import time
 import traceback
@@ -163,7 +164,7 @@ class SymbolicRegressor:
         with open(file, "wb") as f:
             self_copy = copy.deepcopy(self)
             self_copy.callbacks = list()
-            pickle.dump(compress(self_copy), f)
+            cloudpickle.dump(compress(self_copy), f)
 
         # Dump the self.metadata in a json file
         with open(file + ".metadata.json", "w") as f:
@@ -174,7 +175,7 @@ class SymbolicRegressor:
 
     def load_model(self, file: str):
         with open(file, "rb") as f:
-            sr: SymbolicRegressor = pickle.load(f)
+            sr: SymbolicRegressor = cloudpickle.load(f)
 
         try:
             sr = decompress(sr)
@@ -2228,12 +2229,12 @@ class SymbolicRegressor:
 
 
 def compress(object):
-    serialized_data = pickle.dumps(object)
+    serialized_data = cloudpickle.dumps(object)
     compressed_data = zlib.compress(serialized_data)
     return compressed_data
 
 
 def decompress(compressed_data):
     serialized_data = zlib.decompress(compressed_data)
-    object = pickle.loads(serialized_data)
+    object = cloudpickle.loads(serialized_data)
     return object

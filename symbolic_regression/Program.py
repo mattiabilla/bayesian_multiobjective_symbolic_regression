@@ -1708,7 +1708,6 @@ class Program:
 
     def sample(self, data: Union[dict, pd.Series, pd.DataFrame], target: str, draws=1000, chains=2, beta=1, trace=None, mu=None, sd=None, seed=42):
         l_expr, sym_list, mle_d, n_const = self._get_lamb_expr()
-        self.lamb_expr = l_expr
 
         mle_values = [k for k in mle_d]
         self.mle_const = np.array(mle_values).astype(float)
@@ -1752,8 +1751,7 @@ class Program:
 
             list_input = [nl_input[:,i] for i in range(nl_input.get_value().shape[1])]
 
-            mu =  self.lamb_expr(alpha, *list_input)
-            
+            mu = l_expr(alpha, *list_input)
             
 
             def normal_logp(value, mu, sigma):
