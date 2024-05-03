@@ -368,9 +368,9 @@ class WMSEBICScaled(BaseFitness):
             else:
                 WMSE = ((pred - data[self.target])**2).mean()
 
-            NLL = len(data[self.target]) / 2 * (1 + np.log(WMSE))
+            #NLL = len(data[self.target]) / 2 * (1 + np.log(WMSE))
 
-            BIC = (np.log(self.n0) * k) + (2 * NLL)*self.n0/len(data[self.target])
+            BIC = (1 + np.log(WMSE) + np.log(2*np.pi))*self.n0 + (np.log(self.n0) * k) 
             return BIC
 
         except TypeError:
@@ -483,7 +483,8 @@ class RegressionMinimumDescriptionLength(BaseFitness):
             return np.inf
         except NameError:
             return np.inf
-
+            
+            
 
 class NotConstant(BaseFitness):
 
