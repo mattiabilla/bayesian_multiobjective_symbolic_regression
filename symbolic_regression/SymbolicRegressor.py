@@ -1390,6 +1390,51 @@ class SymbolicRegressor:
 
         return new_ps
 
+    def get_delta_programs(self, delta: float = 3) -> list:
+        """
+        This method returns a list containing the program with the highest hypervolume
+        and the programs within delta distance from it.
+
+        Args:
+            - delta: float
+                The delta distance
+
+        Returns:
+            - delta_programs: list
+                The list containing the program with the highest hypervolume
+                and the programs within delta distance from it
+        """
+        
+        nadir = []
+        for f in self.fitness_functions:
+            if not f.minimize:
+                continue
+            nadir.append(max([p.fitness[f.label] for p in self.first_pareto_front if p.fitness[f.label] < np.inf]))
+        
+        
+        def fit_arr(program):
+            fitness_to_list = list()
+            for fitness in program.fitness_functions:
+                if fitness.minimize:
+                    fitness_to_list.append(program.fitness[fitness.label])
+            return fitness_to_list
+        
+        
+        pmax = self.first_pareto_front[0]
+        hmax = _HyperVolume(np.array(nadir)).compute([np.array(fit_arr(pmax))])
+        for p in self.first_pareto_front:
+            ph = _HyperVolume(np.array(nadir)).compute([np.array(fit_arr(p))])
+            if hmax < ph:
+                hmax = ph
+                pmax = p
+        
+        delta_programs = []
+        for p in self.first_pareto_front:
+            if np.linalg.norm(np.array(fit_arr(pmax))-np.array(fit_arr(p)),2) < delta:
+                delta_programs.append(p)
+        
+        return delta_programs  
+
     def _tournament_selection(self, population: Population, tournament_size: int, generation: int) -> Program:
         """
         Tournament selection
