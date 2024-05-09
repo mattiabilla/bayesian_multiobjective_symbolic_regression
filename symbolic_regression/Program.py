@@ -1822,4 +1822,33 @@ class Program:
         x = np.concatenate([[x[0] - 3 * width], x, [x[-1] + 3 * width]])
         y = np.concatenate([[0], y, [0]])
         return Interpolated(param, x, y)
+
+    def get_norm_traces(self, draws: int = 1000, chains: int = 2, n0: int = 100, seed: int = 42):
+    
+        def get_weights(rep_dic):
+            return [k for k,v in rep_dic.items()]
         
+        weights = list()
+
+        for dc in self.fitness_functions:
+            self.optimize(
+                    data=dc.data,
+                    target=dc.target,
+                    weights=None,
+                    constants_optimization=dc.constants_optimization,
+                    constants_optimization_conf=dc.constants_optimization_conf,
+                    inplace=True
+                )
+            
+            weights.append(get_weights(self._get_lamb_expr()[2]))
+        weights = np.array(weights)
+        w_mean = np.mean(weights, axis=0)
+        w_mean = w_mean.astype(float)
+        w_range = np.max(weights, axis=0)-np.min(weights, axis=0)
+        w_range = w_range.astype(float)
+        traces = []
+        for dc in self.fitness_functions:
+            self.sample(dc.data, dc.target, draws=draws, chains=chains, mu=w_mean, sd=w_range, beta=(1/len(dc.data[dc.target]))*n0, seed=seed)
+            traces.append(self.trace.copy())
+        return traces
+
