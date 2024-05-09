@@ -1884,4 +1884,16 @@ class Program:
                 
             self.sample(dc.data, dc.target, draws=draws, chains=chains, beta=beta, trace=self.trace, mu=w_mean, sd=w_range, seed=seed)
           
+    def compute_within(self, data, target, seed=42):
+        pps = self.pps(data, seed)
+
+        pps_q = pps.predictions["out"].quantile((.025, 0.25, 0.75, .975), dim=("chain", "draw"))
+
+        pred_within_95 = (data[target]>=pps_q[0]) & (data[target]<=pps_q[3])
+        pred_within_50 = (data[target]>=pps_q[1]) & (data[target]<=pps_q[2])
+
+        w_95 = np.count_nonzero(pred_within_95)/len(data[target])
+        w_50 = np.count_nonzero(pred_within_50)/len(data[target])
+        
+        return w_50, w_95
 
