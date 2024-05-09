@@ -1779,7 +1779,7 @@ class Program:
             self.trace = pm.sample(draws, chains=chains, init="adapt_diag", random_seed=seed, target_accept=0.9)
 
 
-    def ppc(self, data: Union[dict, pd.Series, pd.DataFrame], target: str):
+    def ppc(self, data: Union[dict, pd.Series, pd.DataFrame], target: str, seed=42):
         l_expr, sym_list, mle_d, n_const = self._get_lamb_expr()
         X_test = data[sym_list].to_numpy()
         y_test = data[target].to_numpy()
@@ -1791,11 +1791,11 @@ class Program:
 
         with self.prob_mod:
             pm.set_data(new_data={"nl_input": X_test, "nl_output": y_test}, coords=test_coords)
-            ppc = pm.sample_posterior_predictive(self.trace)
+            ppc = pm.sample_posterior_predictive(self.trace, random_seed=seed)
 
         return ppc
     
-    def pps(self, data: Union[dict, pd.Series, pd.DataFrame]):
+    def pps(self, data: Union[dict, pd.Series, pd.DataFrame], seed=42):
         l_expr, sym_list, mle_d, n_const = self._get_lamb_expr()
         X_test = data[sym_list].to_numpy()
         y_dummy = np.zeros(X_test.shape[0])
@@ -1807,7 +1807,7 @@ class Program:
 
         with self.prob_mod:
             pm.set_data(new_data={"nl_input": X_test, "nl_output": y_dummy}, coords=test_coords)
-            ppc = pm.sample_posterior_predictive(self.trace, predictions=True)
+            ppc = pm.sample_posterior_predictive(self.trace, predictions=True, random_seed=seed)
 
         return ppc
         
