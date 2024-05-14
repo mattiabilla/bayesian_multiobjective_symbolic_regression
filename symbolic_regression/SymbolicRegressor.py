@@ -10,7 +10,9 @@ import random
 import time
 import traceback
 import zlib
+import itertools
 from itertools import repeat
+
 from multiprocessing import Process, Queue
 from typing import Any, Dict, List, Tuple, Union
 
@@ -19,7 +21,10 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objs as go
 from loky import get_reusable_executor
+from scipy import stats
 from scipy.stats import spearmanr
+
+import arviz as az
 
 from symbolic_regression.callbacks.CallbackBase import MOSRCallbackBase
 from symbolic_regression.multiobjective.fitness.Base import BaseFitness
@@ -1453,6 +1458,24 @@ class SymbolicRegressor:
                 delta_programs.append(p)
         
         return delta_programs  
+
+    def get_compatible_programs(self, delta: float = 3, threshold: float = 0.9) -> list:
+        programs = self.get_delta_programs(delta)
+        programs_to_return = []
+        for program in programs:
+            compatible = True
+            traces = program.get_norm_traces()
+            for t0, t1 in itertools.combinations(traces, 2):
+                for v in range(program._get_lamb_expr()[3]):
+                    te0 = az.extract(t0, group='posterior', combined=True, var_names=f"alpha{v}").values.copy()
+                    te1 = az.extract(t1, group='posterior', combined=True, var_names=f"alpha{v}").values.copy()
+                    if stats.ks_2samp(te0, te1).statistic > threshold:
+                        compatible = False
+                        # print("not compatible: "+str(program))
+            
+            if compatible:
+                programs_to_return.append(program)
+        return programs_to_return
 
     def _tournament_selection(self, population: Population, tournament_size: int, generation: int) -> Program:
         """
