@@ -1874,6 +1874,7 @@ class Program:
         w_mean = np.mean(weights, axis=0)
         w_mean = w_mean.astype(float)
         w_range = np.max(weights, axis=0)-np.min(weights, axis=0)
+        w_range = np.maximum(w_range, np.ones(w_range.shape)/100)
         w_range = w_range.astype(float)
              
         self.trace = None
