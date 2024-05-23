@@ -114,6 +114,22 @@ OPERATOR_ABS = {
     "format_str": "abs({})"
 }
 
+OPERATOR_SIN = {
+    "func": np.sin,
+    "format_tf": 'tf.sin({})',
+    "arity": 1,
+    "symbol": "sin",
+    "format_str": "sin({})"
+}
+
+OPERATOR_COS = {
+    "func": np.cos,
+    "format_tf": 'tf.cos({})',
+    "arity": 1,
+    "symbol": "cos",
+    "format_str": "cos({})"
+}
+
 OPERATOR_LOG = {
     "func": _protected_log,
     "format_tf": 'tf.math.log({})',

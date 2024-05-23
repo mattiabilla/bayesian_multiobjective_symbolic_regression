@@ -53,6 +53,12 @@ def extract_operation(element_to_extract: Union[FeatureNode, OperationNode, Inva
 
     elif str(element.func) == 'abs':
         current_operation = OPERATOR_ABS
+        
+    elif str(element.func) == 'sin':
+        current_operation = OPERATOR_SIN
+
+    elif str(element.func) == 'cos':
+        current_operation = OPERATOR_COS
 
     elif str(element.func) == 'Min':
         current_operation = OPERATOR_MIN
