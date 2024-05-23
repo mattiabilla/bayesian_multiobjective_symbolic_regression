@@ -14,6 +14,7 @@ from pytexit import py2tex
 
 import arviz as az
 import pymc as pm
+import pytensor as pt
 from pymc_experimental.utils.prior import prior_from_idata, _flatten, _parse_args
 from pymc.distributions import Interpolated
 from scipy import stats
@@ -1706,7 +1707,7 @@ class Program:
         return l_expr, sym_list, mle_d, n_const
     
 
-    def sample(self, data: Union[dict, pd.Series, pd.DataFrame], target: str, draws=1000, chains=2, beta=1, trace=None, mu=None, sd=None, seed=42):
+    def sample(self, data: Union[dict, pd.Series, pd.DataFrame], target: str, draws=1000, chains=2, beta=1, trace=None, mu=None, sd=None, method="NUTS", seed=42):
         l_expr, sym_list, mle_d, n_const = self._get_lamb_expr()
 
         mle_values = [k for k in mle_d]
@@ -1758,6 +1759,13 @@ class Program:
                 #return pm.Normal("out").logp(mu, sigma, value)*beta
                 return pm.logp(pm.Normal.dist(mu, sigma), value)*beta
                 
+                
+            def normal_logp_smc(value, mu, sigma):
+                #return pm.Normal("out").logp(mu, sigma, value)*beta
+                res = pm.logp(pm.Normal.dist(mu, sigma), value)*beta
+                res = pm.math.switch(pt.tensor.isnan(res), -np.inf, res)
+                return res
+                
             def random(mu, sigma, rng=None, size=None):
                 return rng.normal(loc=mu, scale=sigma, size=size)
 
@@ -1767,7 +1775,9 @@ class Program:
 
             
             # Likelihood (sampling distribution) of observations
-            #Y_obs = pm.Normal("out", mu=mu, sigma=sigma, shape=mu.shape, observed=y_train)
+            #Y_obs = pm.Normal("out", mu=mu, sigma=sigma, observed=nl_output, dims=("obs_id",))
+            #print(pm.logp(Y_obs, nl_output).eval())
+            
             custom = pm.DensityDist('out',
                         mu,
                         sigma,
@@ -1775,8 +1785,10 @@ class Program:
                         random=random,
                         observed=nl_output, 
                         dims=("obs_id",))
-            
-            self.trace = pm.sample(draws, chains=chains, init="adapt_diag", random_seed=seed, target_accept=0.9)
+            if method=="SMC":
+                self.trace = pm.smc.sample_smc(draws, chains=chains, random_seed=seed, cores=1)
+            else:
+                self.trace = pm.sample(draws, chains=chains, init="adapt_diag", random_seed=seed, target_accept=0.9)
 
 
     def ppc(self, data: Union[dict, pd.Series, pd.DataFrame], target: str, seed=42):
@@ -1823,7 +1835,7 @@ class Program:
         y = np.concatenate([[0], y, [0]])
         return Interpolated(param, x, y)
 
-    def get_norm_traces(self, draws: int = 1000, chains: int = 2, n0: int = 100, seed: int = 42):
+    def get_norm_traces(self, draws: int = 1000, chains: int = 2, n0: int = 100, method = "NUTS", seed: int = 42):
     
         def get_weights(rep_dic):
             return [k for k,v in rep_dic.items()]
@@ -1848,11 +1860,11 @@ class Program:
         w_range = w_range.astype(float)
         traces = []
         for dc in self.fitness_functions:
-            self.sample(dc.data, dc.target, draws=draws, chains=chains, mu=w_mean, sd=w_range, beta=(1/len(dc.data[dc.target]))*n0, seed=seed)
+            self.sample(dc.data, dc.target, draws=draws, chains=chains, mu=w_mean, sd=w_range, beta=(1/len(dc.data[dc.target]))*n0, method=method, seed=seed)
             traces.append(self.trace.copy())
         return traces
         
-    def compute_posterior_seq(self, draws: int = 1000, chains: int = 2, n0:int = None, seed: int = 42):
+    def compute_posterior_seq(self, draws: int = 1000, chains: int = 2, n0:int = None, method = "NUTS", seed: int = 42):
     
         def get_weights(rep_dic):
             return [k for k,v in rep_dic.items()]
@@ -1883,7 +1895,7 @@ class Program:
             if n0 is not None:
                 beta = (1/len(dc.data[dc.target]))*n0
                 
-            self.sample(dc.data, dc.target, draws=draws, chains=chains, beta=beta, trace=self.trace, mu=w_mean, sd=w_range, seed=seed)
+            self.sample(dc.data, dc.target, draws=draws, chains=chains, beta=beta, trace=self.trace, mu=w_mean, sd=w_range, method=method, seed=seed)
           
     def compute_within(self, data, target, seed=42):
         pps = self.pps(data, seed)
