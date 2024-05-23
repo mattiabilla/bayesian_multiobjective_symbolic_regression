@@ -1778,10 +1778,15 @@ class Program:
             #Y_obs = pm.Normal("out", mu=mu, sigma=sigma, observed=nl_output, dims=("obs_id",))
             #print(pm.logp(Y_obs, nl_output).eval())
             
+            if method=="SMC":
+                logp_f = normal_logp_smc
+            else:
+                logp_f = normal_logp
+            
             custom = pm.DensityDist('out',
                         mu,
                         sigma,
-                        logp=normal_logp,
+                        logp=logp_f,
                         random=random,
                         observed=nl_output, 
                         dims=("obs_id",))
