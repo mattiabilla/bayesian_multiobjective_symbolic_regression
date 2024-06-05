@@ -41,6 +41,10 @@ class Node(ABC):
     @abstractmethod
     def _get_depth(self, depth: int = 0) -> int:
         raise NotImplementedError
+        
+    @abstractmethod
+    def _get_probability(self, parsimony, decay, depth: int = 0):
+        raise NotImplementedError
 
     @abstractmethod
     def _get_features(self, features: List['FeatureNode'] = list) -> List['FeatureNode']:
@@ -258,6 +262,20 @@ class OperationNode(Node):
                 for child in self.operands)
 
         return new_depth
+        
+    def _get_probability(self, parsimony, decay, depth: int = 0):
+        
+        prob_children = []
+        
+        for child in self.operands:
+            prob_children.append(child._get_probability(parsimony, decay, depth=depth+1))
+            
+        prob_ret = 1
+            
+        for prob in prob_children:
+            prob_ret *= prob
+        
+        return parsimony*(decay**depth)*prob_ret
 
     def _get_features(self, features_list: List = list, return_objects: bool = False) -> List:
         """ This method recursively gets all the features in the program
@@ -622,6 +640,11 @@ class FeatureNode(Node):
                 The depth of the FeatureNode
         """
         return base_depth + 1
+        
+    def _get_probability(self, parsimony, decay, depth: int = 0):
+                
+        return 1 - parsimony*(decay**depth)
+        
 
     def _get_features(self, features_list: list = list):
         return features_list
@@ -801,6 +824,11 @@ class InvalidNode(Node):
                 The depth of the InvalidNode
         """
         return base_depth + 1
+        
+        
+    def _get_probability(self, parsimony, decay, depth: int = 0):
+                
+        return 1 - parsimony*(decay**depth)
 
     def _get_operations_used(self, base_operations_used: Dict = dict) -> Dict:
         """ This method returns the operations used in the program
