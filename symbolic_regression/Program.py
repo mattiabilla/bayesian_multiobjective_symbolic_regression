@@ -131,6 +131,7 @@ class Program:
         
         self.trace = None
         self.cov_prior = None
+        self.marginal_likelihood = None
 
         if program:
             self.program: Node = program
@@ -1895,12 +1896,19 @@ class Program:
         w_range = w_range.astype(float)
              
         self.trace = None
+        
+        if method == "SMC":
+            self.marginal_likelihood = []
+        
         for dc in self.fitness_functions:
             beta = 1
             if n0 is not None:
                 beta = (1/len(dc.data[dc.target]))*n0
                 
             self.sample(dc.data, dc.target, draws=draws, chains=chains, beta=beta, trace=self.trace, mu=w_mean, sd=w_range, method=method, seed=seed)
+            
+            if method == "SMC":
+                self.marginal_likelihood.append(self.trace.sample_stats["log_marginal_likelihood"].mean().values.tolist())
           
     def compute_within(self, data, target, seed=42):
         pps = self.pps(data, seed)
