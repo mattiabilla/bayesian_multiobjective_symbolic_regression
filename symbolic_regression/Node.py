@@ -109,7 +109,7 @@ class OperationNode(Node):
             This method recursively renders the program as a string
     """
 
-    def __init__(self, operation: callable, format_tf: str, format_diff: str, arity: int, symbol: str, format_str: str, father: Node) -> None:
+    def __init__(self, operation: callable, format_tf: str, format_diff: str, arity: int, symbol: str, format_str: str, commutative: bool, father: Node) -> None:
         """ This method initializes the OperationNode
 
         Args:
@@ -136,7 +136,7 @@ class OperationNode(Node):
         self.format_str = format_str
         self.format_tf = format_tf
         self.format_diff = format_diff if format_diff else format_str
-
+        self.commutative = commutative
         self.operands = []
 
     def __repr__(self) -> str:
@@ -270,12 +270,15 @@ class OperationNode(Node):
         for child in self.operands:
             prob_children.append(child._get_probability(parsimony, decay, depth=depth+1))
             
-        prob_ret = 1
+        prob_ret = 0
             
         for prob in prob_children:
-            prob_ret *= prob
+            prob_ret += prob
         
-        return parsimony*(decay**depth)*prob_ret
+        if self.commutative:
+            prob_ret += np.log(2)
+        
+        return np.log(parsimony)+np.log(decay**depth)+prob_ret
 
     def _get_features(self, features_list: List = list, return_objects: bool = False) -> List:
         """ This method recursively gets all the features in the program
@@ -643,7 +646,7 @@ class FeatureNode(Node):
         
     def _get_probability(self, parsimony, decay, depth: int = 0):
                 
-        return 1 - parsimony*(decay**depth)
+        return np.log(1 - parsimony*(decay**depth))
         
 
     def _get_features(self, features_list: list = list):
@@ -828,7 +831,7 @@ class InvalidNode(Node):
         
     def _get_probability(self, parsimony, decay, depth: int = 0):
                 
-        return 1 - parsimony*(decay**depth)
+        return np.log(1 - parsimony*(decay**depth))
 
     def _get_operations_used(self, base_operations_used: Dict = dict) -> Dict:
         """ This method returns the operations used in the program

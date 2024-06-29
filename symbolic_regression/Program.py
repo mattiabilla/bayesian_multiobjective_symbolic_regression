@@ -551,6 +551,7 @@ class Program:
                                  symbol=operation_conf.get('symbol'),
                                  format_diff=operation_conf.get(
                                      'format_diff', operation_conf.get('format_str')),
+                                 commutative = operation_conf.get("commutative"),
                                  father=father)
 
         def gen_feature(feature: str, father: Union[Node, None], is_constant: bool = False):
@@ -1190,6 +1191,7 @@ class Program:
             symbol=OPERATOR_ADD.get('symbol'),
             format_diff=OPERATOR_ADD.get(
                 'format_diff', OPERATOR_ADD['format_str']),
+            commutative = OPERATOR_ADD.get("commutative"),
             father=None
         )
         add_node.add_operand(FeatureNode(
@@ -1203,6 +1205,7 @@ class Program:
             symbol=OPERATOR_MUL.get('symbol'),
             format_diff=OPERATOR_MUL.get(
                 'format_diff', OPERATOR_MUL['format_str']),
+            commutative = OPERATOR_MUL.get("commutative"),
             father=add_node
         )
 
@@ -1242,6 +1245,7 @@ class Program:
             symbol=OPERATOR_SIGMOID.get('symbol'),
             format_diff=OPERATOR_SIGMOID.get(
                 'format_diff', OPERATOR_SIGMOID['format_str']),
+            commutative = OPERATOR_SIGMOID.get("commutative"),
             father=None
         )
         # So the upward pointer of the father is not permanent

@@ -96,6 +96,7 @@ def extract_operation(element_to_extract: Union[FeatureNode, OperationNode, Inva
             symbol=current_operation['symbol'],
             format_diff=current_operation.get(
                 'format_diff', current_operation['format_str']),
+            commutative = current_operation.get("commutative"),
             father=father
         )
 
