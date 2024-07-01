@@ -1189,9 +1189,10 @@ class SymbolicRegressor:
 
                 number_p_to_remove = len(
                     population_to_finalize) + len(p_in_last_rank) - self.population_size
-
+                print(f"Rank_at_population_size: {rank_at_population_size}")
                 for _ in range(number_p_to_remove):
-
+                    if len(p_in_last_rank)==0:
+                        continue
                     p_in_last_rank.pop()
 
                     if self.genetic_algorithm == 'NSGA-II':
