@@ -594,6 +594,232 @@ class RegressionMDLScaled(BaseFitness):
             return np.inf
 
 
+class RegMDLScaledPrior(BaseFitness):
+
+    def __init__(self, data: pd.DataFrame = None, n0: int = 100, parsimony = 0.9, decay = 0.95, **kwargs) -> None:
+        """ This fitness requires the following arguments:
+
+        - target: str
+        - weights: str
+
+        """
+        super().__init__(**kwargs)
+        self.data = data
+        self.n0 = n0
+        self.parsimony = parsimony
+        self.decay = decay
+
+    def evaluate(self, program, data: pd.DataFrame, validation: bool = False, pred=None) -> float:
+        # if data was previously provided ignore data coming from the regressor
+        if self.data is not None:
+            data = self.data
+            
+        if pred is None:
+            if not program.is_valid:
+                return np.nan
+
+            if not validation:
+                program = self.optimize(program=program, data=data)
+
+            program_to_evaluate = program.to_logistic(
+                inplace=False) if self.logistic else program
+
+            pred = program_to_evaluate.evaluate(data=data)
+
+        if np.isnan(pred).any():
+            return np.inf
+
+        try:
+            if self.weights is not None:
+                WMSE = (((pred - data[self.target])**2)
+                        * data[self.weights]).mean()
+            else:
+                WMSE = ((pred - data[self.target])**2).mean()
+
+            NLL = self.n0 / 2 * (1 + np.log(WMSE))
+
+            n_features = len(program.features)
+            constants = np.array(
+                [item.feature for item in program.get_constants(return_objects=True)])
+            n_constants = constants.size
+            k = n_constants
+            node_states = len(program.operations)+len(program.features)+1
+            tree_complexity = program.complexity*np.log(node_states)
+
+            if n_constants == 0:  # No constants in program
+                MDL = NLL - program.program._get_probability(self.parsimony, self.decay)
+                return MDL
+
+            # Initialize symbols for variables and constants
+            x_sym = ''
+            for f in program.features:
+                x_sym += f'{f},'
+            x_sym = sym.symbols(x_sym)
+            c_sym = sym.symbols('c0:{}'.format(n_constants))
+            p_sym = program.program.render(format_diff=True)
+
+            split_c = np.split(
+                constants*np.ones_like(data[[self.target]]), n_constants, 1)
+            split_X = np.split(
+                data[program.features].to_numpy(), n_features, 1)
+
+            grad = []
+            diag_hess = []
+            for i in range(n_constants):
+                grad.append(sym.diff(p_sym, f'c{i}'))
+                diag_hess.append(sym.diff(sym.diff(p_sym, f'c{i}'), f'c{i}'))
+
+            pyf_grad = lambdify([x_sym, c_sym], grad, modules=[
+                                'numpy', {'DiracDelta': DiracDeltaV, 'Sqrt': np.sqrt}])
+            pyf_diag_hess = lambdify([x_sym, c_sym], diag_hess, modules=[
+                                     'numpy', {'DiracDelta': DiracDeltaV}])
+            num_grad = pyf_grad(tuple(split_X), tuple(split_c))
+            num_diag_hess = pyf_diag_hess(tuple(split_X), tuple(split_c))
+
+            residual = data[self.target] - pred
+            residual = np.expand_dims(residual, -1)
+
+            if self.weights is not None:
+                w = data[[self.weights]].to_numpy()
+                FIM_diag = [np.sum(w * gr**2 - w * residual*hess) /
+                            WMSE for (gr, hess) in zip(num_grad, num_diag_hess)]
+            else:
+                FIM_diag = [np.sum(gr**2 - residual*hess) /
+                            WMSE for (gr, hess) in zip(num_grad, num_diag_hess)]
+
+            #Delta = [min(np.sqrt(12/fi), np.abs(c))
+            #         for fi, c in zip(FIM_diag, constants)]
+
+            #constant_complexities = [np.log(np.abs(
+            #    c)/d) + np.log(2) if np.abs(c) != d else 0 for c, d in zip(constants, Delta)]
+            #constant_complexity = np.sum(constant_complexities)
+
+            
+            MDL = NLL + k/2*np.log(self.n0/(2*np.pi)) + (1/2)*np.sum(np.log(FIM_diag)) - program.program._get_probability(self.parsimony, self.decay)
+            return MDL
+
+        except TypeError:
+            return np.inf
+        except ValueError:
+            return np.inf
+        except NameError:
+            return np.inf
+
+
+
+class RegMDLScaledGeom(BaseFitness):
+
+    def __init__(self, data: pd.DataFrame = None, n0: int = 100, **kwargs) -> None:
+        """ This fitness requires the following arguments:
+
+        - target: str
+        - weights: str
+
+        """
+        super().__init__(**kwargs)
+        self.data = data
+        self.n0 = n0
+
+    def evaluate(self, program, data: pd.DataFrame, validation: bool = False, pred=None) -> float:
+        # if data was previously provided ignore data coming from the regressor
+        if self.data is not None:
+            data = self.data
+            
+        if pred is None:
+            if not program.is_valid:
+                return np.nan
+
+            if not validation:
+                program = self.optimize(program=program, data=data)
+
+            program_to_evaluate = program.to_logistic(
+                inplace=False) if self.logistic else program
+
+            pred = program_to_evaluate.evaluate(data=data)
+
+        if np.isnan(pred).any():
+            return np.inf
+
+        try:
+            if self.weights is not None:
+                WMSE = (((pred - data[self.target])**2)
+                        * data[self.weights]).mean()
+            else:
+                WMSE = ((pred - data[self.target])**2).mean()
+
+            NLL = self.n0 / 2 * (1 + np.log(WMSE))
+
+            n_features = len(program.features)
+            constants = np.array(
+                [item.feature for item in program.get_constants(return_objects=True)])
+            n_constants = constants.size
+            k = n_constants
+            node_states = len(program.operations)+len(program.features)+1
+            tree_complexity = program.complexity*np.log(node_states)
+            
+            ft = max(n_features,1)
+            p0 = 0.125/(ft+4*ft**2)*(1+4*ft+0.45*np.sqrt(5+38*ft+72*ft**2))
+            #pt = (1-p0)**(program.complexity-1)*p0
+
+            if n_constants == 0:  # No constants in program
+                MDL = NLL - (program.complexity-1)*np.log(1-p0)
+                return MDL
+
+            # Initialize symbols for variables and constants
+            x_sym = ''
+            for f in program.features:
+                x_sym += f'{f},'
+            x_sym = sym.symbols(x_sym)
+            c_sym = sym.symbols('c0:{}'.format(n_constants))
+            p_sym = program.program.render(format_diff=True)
+
+            split_c = np.split(
+                constants*np.ones_like(data[[self.target]]), n_constants, 1)
+            split_X = np.split(
+                data[program.features].to_numpy(), n_features, 1)
+
+            grad = []
+            diag_hess = []
+            for i in range(n_constants):
+                grad.append(sym.diff(p_sym, f'c{i}'))
+                diag_hess.append(sym.diff(sym.diff(p_sym, f'c{i}'), f'c{i}'))
+
+            pyf_grad = lambdify([x_sym, c_sym], grad, modules=[
+                                'numpy', {'DiracDelta': DiracDeltaV, 'Sqrt': np.sqrt}])
+            pyf_diag_hess = lambdify([x_sym, c_sym], diag_hess, modules=[
+                                     'numpy', {'DiracDelta': DiracDeltaV}])
+            num_grad = pyf_grad(tuple(split_X), tuple(split_c))
+            num_diag_hess = pyf_diag_hess(tuple(split_X), tuple(split_c))
+
+            residual = data[self.target] - pred
+            residual = np.expand_dims(residual, -1)
+
+            if self.weights is not None:
+                w = data[[self.weights]].to_numpy()
+                FIM_diag = [np.sum(w * gr**2 - w * residual*hess) /
+                            WMSE for (gr, hess) in zip(num_grad, num_diag_hess)]
+            else:
+                FIM_diag = [np.sum(gr**2 - residual*hess) /
+                            WMSE for (gr, hess) in zip(num_grad, num_diag_hess)]
+
+            #Delta = [min(np.sqrt(12/fi), np.abs(c))
+            #         for fi, c in zip(FIM_diag, constants)]
+
+            #constant_complexities = [np.log(np.abs(
+            #    c)/d) + np.log(2) if np.abs(c) != d else 0 for c, d in zip(constants, Delta)]
+            #constant_complexity = np.sum(constant_complexities)
+
+            
+            MDL = NLL + k/2*np.log(self.n0/(2*np.pi)) + (1/2)*np.sum(np.log(FIM_diag))- (program.complexity-1)*np.log(1-p0)
+            return MDL
+
+        except TypeError:
+            return np.inf
+        except ValueError:
+            return np.inf
+        except NameError:
+            return np.inf     
+            
 class NotConstant(BaseFitness):
 
     def __init__(self, **kwargs) -> None:
