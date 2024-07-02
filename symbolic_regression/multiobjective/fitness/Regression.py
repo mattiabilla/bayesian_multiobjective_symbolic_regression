@@ -14,7 +14,7 @@ def DiracDeltaV(x):
 
 class WeightedMeanSquaredError(BaseFitness):
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, data: pd.DataFrame = None, **kwargs) -> None:
         """ This fitness requires the following arguments:
 
         - target: str
@@ -22,9 +22,13 @@ class WeightedMeanSquaredError(BaseFitness):
 
         """
         super().__init__(**kwargs)
+        self.data = data
 
     def evaluate(self, program, data: pd.DataFrame, validation: bool = False, pred=None) -> float:
-
+        # if data was previously provided ignore data coming from the regressor
+        if self.data is not None:
+            data = self.data
+            
         if pred is None:
             if not program.is_valid:
                 return np.nan
