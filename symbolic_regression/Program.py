@@ -4,6 +4,11 @@ import random
 import signal
 from typing import Dict, List, Tuple, Union
 
+import os
+import zlib
+import pickle
+import cloudpickle
+
 import numpy as np
 import pandas as pd
 import sympy
@@ -1927,3 +1932,29 @@ class Program:
         
         return w_50, w_95
 
+
+    def save_model(self, file: str):
+        from symbolic_regression.SymbolicRegressor import compress
+        file = file + ".sr"
+        directory = os.path.dirname(file)
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+        with open(file, "wb") as f:
+            self_copy = copy.deepcopy(self)
+            cloudpickle.dump(compress(self_copy), f)
+            
+            
+    def load_model(file: str):
+        from symbolic_regression.SymbolicRegressor import decompress
+        with open(file, "rb") as f:
+            sr: Program = cloudpickle.load(f)
+
+        try:
+            sr = decompress(sr)
+            logging.debug(f"Loaded compressed model from {file}")
+        except TypeError:
+            pass
+
+        return sr
+            
+            
