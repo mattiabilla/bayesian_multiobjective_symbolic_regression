@@ -1858,16 +1858,17 @@ class Program:
         weights = list()
 
         for dc in self.fitness_functions:
-            self.optimize(
-                    data=dc.data,
-                    target=dc.target,
-                    weights=None,
-                    constants_optimization=dc.constants_optimization,
-                    constants_optimization_conf=dc.constants_optimization_conf,
-                    inplace=True
-                )
-            
-            weights.append(get_weights(self._get_lamb_expr()[2]))
+            if self.is_fitness_to_minimize[dc.label]:
+                self.optimize(
+                        data=dc.data,
+                        target=dc.target,
+                        weights=None,
+                        constants_optimization=dc.constants_optimization,
+                        constants_optimization_conf=dc.constants_optimization_conf,
+                        inplace=True
+                    )
+                
+                weights.append(get_weights(self._get_lamb_expr()[2]))
         weights = np.array(weights)
         w_mean = np.mean(weights, axis=0)
         w_mean = w_mean.astype(float)
@@ -1875,8 +1876,9 @@ class Program:
         w_range = w_range.astype(float)
         traces = []
         for dc in self.fitness_functions:
-            self.sample(dc.data, dc.target, draws=draws, chains=chains, mu=w_mean, sd=w_range, beta=(1/len(dc.data[dc.target]))*n0, method=method, seed=seed)
-            traces.append(self.trace.copy())
+            if self.is_fitness_to_minimize[dc.label]:
+                self.sample(dc.data, dc.target, draws=draws, chains=chains, mu=w_mean, sd=w_range, beta=(1/len(dc.data[dc.target]))*n0, method=method, seed=seed)
+                traces.append(self.trace.copy())
         return traces
         
     def compute_posterior_seq(self, draws: int = 1000, chains: int = 2, n0:int = None, method = "NUTS", seed: int = 42):
@@ -1887,16 +1889,17 @@ class Program:
         weights = list()
 
         for dc in self.fitness_functions:
-            self.optimize(
-                    data=dc.data,
-                    target=dc.target,
-                    weights=None,
-                    constants_optimization=dc.constants_optimization,
-                    constants_optimization_conf=dc.constants_optimization_conf,
-                    inplace=True
-                )
-            
-            weights.append(get_weights(self._get_lamb_expr()[2]))
+            if self.is_fitness_to_minimize[dc.label]:
+                self.optimize(
+                        data=dc.data,
+                        target=dc.target,
+                        weights=None,
+                        constants_optimization=dc.constants_optimization,
+                        constants_optimization_conf=dc.constants_optimization_conf,
+                        inplace=True
+                    )
+                
+                weights.append(get_weights(self._get_lamb_expr()[2]))
         weights = np.array(weights)
         w_mean = np.mean(weights, axis=0)
         w_mean = w_mean.astype(float)
@@ -1918,7 +1921,14 @@ class Program:
                 self.sample(dc.data, dc.target, draws=draws, chains=chains, beta=beta, trace=self.trace, mu=w_mean, sd=w_range, method=method, seed=seed)
                 
                 if method == "SMC":
-                    self.marginal_likelihood.append(self.trace.sample_stats["log_marginal_likelihood"].mean().values.tolist())
+                    try:
+                        self.marginal_likelihood.append(self.trace.sample_stats["log_marginal_likelihood"].mean().values.tolist())
+                    except:
+                        for c in range(len(self.trace.posterior.chain.values)):
+                            marginal_to_add = np.nanmean(np.array(self.trace.sample_stats["log_marginal_likelihood"].to_numpy()[0][c]))
+                            self.marginal_likelihood.append(marginal_to_add)
+                            
+                            
           
     def compute_within(self, data, target, seed=42):
         pps = self.pps(data, seed)
