@@ -1924,9 +1924,11 @@ class Program:
                     try:
                         self.marginal_likelihood.append(self.trace.sample_stats["log_marginal_likelihood"].mean().values.tolist())
                     except:
+                        marginals = np.zeros(len(self.trace.posterior.chain.values))
                         for c in range(len(self.trace.posterior.chain.values)):
-                            marginal_to_add = np.nanmean(np.array(self.trace.sample_stats["log_marginal_likelihood"].to_numpy()[0][c]))
-                            self.marginal_likelihood.append(marginal_to_add)
+                            marginals[c] = np.nanmean(np.array(self.trace.sample_stats["log_marginal_likelihood"].to_numpy()[0][c]))
+                        
+                        self.marginal_likelihood.append(np.nanmean(marginals))
                             
                             
           
