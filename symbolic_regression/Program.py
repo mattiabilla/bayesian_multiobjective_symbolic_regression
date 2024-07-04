@@ -1910,14 +1910,15 @@ class Program:
             self.marginal_likelihood = []
         
         for dc in self.fitness_functions:
-            beta = 1
-            if n0 is not None:
-                beta = (1/len(dc.data[dc.target]))*n0
+            if self.is_fitness_to_minimize[dc.label]:
+                beta = 1
+                if n0 is not None:
+                    beta = (1/len(dc.data[dc.target]))*n0
+                    
+                self.sample(dc.data, dc.target, draws=draws, chains=chains, beta=beta, trace=self.trace, mu=w_mean, sd=w_range, method=method, seed=seed)
                 
-            self.sample(dc.data, dc.target, draws=draws, chains=chains, beta=beta, trace=self.trace, mu=w_mean, sd=w_range, method=method, seed=seed)
-            
-            if method == "SMC":
-                self.marginal_likelihood.append(self.trace.sample_stats["log_marginal_likelihood"].mean().values.tolist())
+                if method == "SMC":
+                    self.marginal_likelihood.append(self.trace.sample_stats["log_marginal_likelihood"].mean().values.tolist())
           
     def compute_within(self, data, target, seed=42):
         pps = self.pps(data, seed)
