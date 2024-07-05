@@ -33,7 +33,7 @@ class WeightedMeanSquaredError(BaseFitness):
             if not program.is_valid:
                 return np.nan
 
-            if not validation:
+            if not validation and self.minimize:
                 program = self.optimize(program=program, data=data)
 
             program_to_evaluate = program.to_logistic(
