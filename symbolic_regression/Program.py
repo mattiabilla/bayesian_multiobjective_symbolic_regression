@@ -1887,7 +1887,8 @@ class Program:
             return [k for k,v in rep_dic.items()]
         
         weights = list()
-
+        
+        n_to_min = 0
         for dc in self.fitness_functions:
             if self.is_fitness_to_minimize[dc.label]:
                 self.optimize(
@@ -1900,11 +1901,15 @@ class Program:
                     )
                 
                 weights.append(get_weights(self._get_lamb_expr()[2]))
+                n_to_min += 1
         weights = np.array(weights)
         w_mean = np.mean(weights, axis=0)
         w_mean = w_mean.astype(float)
         w_range = np.max(weights, axis=0)-np.min(weights, axis=0)
-        w_range = np.maximum(w_range, np.ones(w_range.shape)/100)
+        if n_to_min < 2:
+            w_range = np.maximum(w_range, np.ones(w_range.shape)/0.1)
+        else:
+            w_range = np.maximum(w_range, np.ones(w_range.shape)/100)
         w_range = w_range.astype(float)
              
         self.trace = None
