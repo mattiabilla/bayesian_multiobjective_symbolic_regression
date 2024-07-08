@@ -6,7 +6,8 @@ from sympy import lambdify
 import sympy as sym
 
 from symbolic_regression.multiobjective.fitness.Base import BaseFitness
-
+from symbolic_regression.Node import (FeatureNode, InvalidNode, Node,
+                                      OperationNode)
 
 def DiracDeltaV(x):
     return np.where(np.abs(x) < 1e-7, 1e7, 0)
@@ -371,6 +372,92 @@ class WMSEBICScaled(BaseFitness):
                         * data[self.weights]).mean()
             else:
                 WMSE = ((pred - data[self.target])**2).mean()
+
+            #NLL = len(data[self.target]) / 2 * (1 + np.log(WMSE))
+
+            BIC = (1 + np.log(WMSE) + np.log(2*np.pi))*self.n0 + (np.log(self.n0) * k) 
+            return BIC
+
+        except TypeError:
+            return np.inf
+        except ValueError:
+            return np.inf
+        except NameError:
+            return np.inf
+
+
+class FedWMSEBICScaled(BaseFitness):
+
+    def __init__(self, data: list = None, n0: int = 100, rounds: int = 10, **kwargs) -> None:
+        """ This fitness requires the following arguments:
+
+        - target: str
+        - weights: str
+
+        """
+        super().__init__(**kwargs)
+        self.data = data
+        self.n0 = n0
+        self.rounds = rounds
+        
+
+    def evaluate(self, program, data: pd.DataFrame, validation: bool = False, pred=None) -> float:
+        # if data was previously provided ignore data coming from the regressor
+        if self.data is not None:
+            data = self.data
+        else:
+            raise Exception("A list of datasets must be provided during the creation of the fitness instance")
+        
+        def get_weights(rep_dic):
+            return [k for k,v in rep_dic.items()]
+        
+        if pred is None:
+            if not program.is_valid:
+                return np.nan
+
+            if not validation and self.minimize:
+                if not isinstance(program, FeatureNode) and len(program.get_constants(return_objects=False)) > 0:
+                    lengths = [len(d[self.target]) for d in data]
+                    
+                    for r in range(self.rounds):
+                        weights_list = []
+                        for d in data:
+                            program_temp = program.optimize(
+                                            data=d,
+                                            target=self.target,
+                                            weights=self.weights,
+                                            constants_optimization=self.constants_optimization,
+                                            constants_optimization_conf=self.constants_optimization_conf,
+                                            )
+                            weights_list.append(program_temp.get_constants())
+                    
+                        weights_list = np.array(weights_list)
+                        lengths = np.array(lengths)
+                        weights_list = weights_list.astype(float)
+                        lengths = lengths.astype(float)
+                        
+                        w_mean = np.average(weights_list, weights=lengths, axis=0)
+                        w_mean = w_mean.astype(float)
+                        program.set_constants(new=w_mean.tolist())
+
+            program_to_evaluate = program.to_logistic(
+                inplace=False) if self.logistic else program
+            
+            
+            all_data = pd.concat(data)
+            pred = program_to_evaluate.evaluate(data=all_data)
+
+        if np.isnan(pred).any():
+            return np.inf
+
+        try:
+            k = len(program_to_evaluate.get_constants())
+
+            if self.weights is not None:
+                WMSE = (((pred - all_data[self.target])**2)
+                        * all_data[self.weights]).mean()
+            else:
+                WMSE = ((pred - all_data[self.target])**2).mean()
 
             #NLL = len(data[self.target]) / 2 * (1 + np.log(WMSE))
 
