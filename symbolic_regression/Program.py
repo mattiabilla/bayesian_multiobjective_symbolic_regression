@@ -796,12 +796,17 @@ class Program:
             - bool
                 True if the two programs are equivalent, False otherwise.
         """
+        
+        # check program hash
+        if self.simplify().similarity(other.simplify())>0.99:
+            return True
+        
         for (a_label, a_fit), (b_label, b_fit) in zip(self.fitness.items(),
                                                       other.fitness.items()):
             # One difference is enough for them not to be identical
             if round(a_fit, 3) != round(b_fit, 3):
                 return False
-
+        
         return True
 
     def is_constant(self):
