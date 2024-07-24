@@ -798,7 +798,7 @@ class Program:
         """
         
         # check program hash
-        if self.simplify().similarity(other.simplify())>0.99:
+        if self.similarity(other)>0.99:
             return True
         
         for (a_label, a_fit), (b_label, b_fit) in zip(self.fitness.items(),
