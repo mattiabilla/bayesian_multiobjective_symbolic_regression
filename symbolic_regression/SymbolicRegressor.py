@@ -1438,7 +1438,7 @@ class SymbolicRegressor:
         for f in self.fitness_functions:
             if not f.minimize:
                 continue
-            nadir.append(max([p.fitness[f.label] for p in self.first_pareto_front if p.fitness[f.label] < np.inf]))
+            nadir.append(max([p.fitness[f.label] for p in self.population if p.fitness[f.label] < np.inf]))
         
         
         def fit_arr(program):
@@ -1449,16 +1449,16 @@ class SymbolicRegressor:
             return fitness_to_list
         
         
-        pmax = self.first_pareto_front[0]
+        pmax = self.population[0]
         hmax = _HyperVolume(np.array(nadir)).compute([np.array(fit_arr(pmax))])
-        for p in self.first_pareto_front:
+        for p in self.population:
             ph = _HyperVolume(np.array(nadir)).compute([np.array(fit_arr(p))])
             if hmax < ph:
                 hmax = ph
                 pmax = p
         
         delta_programs = []
-        for p in self.first_pareto_front:
+        for p in self.population:
             if np.linalg.norm(np.array(fit_arr(pmax))-np.array(fit_arr(p)),2) < delta:
                 delta_programs.append(p)
         
