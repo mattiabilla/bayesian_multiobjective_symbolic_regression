@@ -472,6 +472,120 @@ class FedWMSEBICScaled(BaseFitness):
             return np.inf
 
 
+class MSBICScaled(BaseFitness):
+
+    def __init__(self, data: list = None, n0: int = 100, bandwidth: float = 3, **kwargs) -> None:
+        """ This fitness requires the following arguments:
+
+        - target: str
+        - weights: str
+
+        """
+        super().__init__(**kwargs)
+        self.data = data
+        self.n0 = n0
+        self.bandwidth = bandwidth
+        
+        
+    def euclidean_distance(self, x1, x2):
+        return np.sqrt(np.sum((x1 - x2) ** 2))
+
+    def gaussian_kernel(self, distance, bandwidth):
+        return np.exp(-0.5 * (distance / bandwidth) ** 2)
+
+
+    def mean_shift(self, X, weigths, bandwidth=3, max_iterations=1000, epsilon=1e-4):
+        centroid = np.random.choice(X)
+        
+        euclidean_distance = self.euclidean_distance
+        gaussian_kernel = self.gaussian_kernel
+        
+        for _ in range(max_iterations):
+            mean_shift = 0
+            weighted_sum = 0
+            total_weight = 1e-7
+            
+            for sample, w in zip(X,weigths):
+                distance = euclidean_distance(sample, centroid)
+                if distance<=bandwidth:
+                    Gweight = gaussian_kernel(distance, bandwidth)
+                    weighted_sum += Gweight * (sample - centroid) * w
+                    total_weight += Gweight * w
+                
+            mean_shift = weighted_sum/total_weight
+            
+            centroid = centroid+mean_shift
+            
+            # Check for convergence
+            if np.all(np.abs(mean_shift < epsilon)):
+                break
+            
+        return centroid
+
+    def evaluate(self, program, data: pd.DataFrame, validation: bool = False, pred=None) -> float:
+        # if data was previously provided ignore data coming from the regressor
+        if self.data is not None:
+            data = self.data
+        else:
+            raise Exception("A list of datasets must be provided during the creation of the fitness instance")
+        
+        def get_weights(rep_dic):
+            return [k for k,v in rep_dic.items()]
+        
+        if pred is None:
+            if not program.is_valid:
+                return np.nan
+
+            
+                    
+
+            program_to_evaluate = program.to_logistic(
+                inplace=False) if self.logistic else program
+            
+            
+            X = list()
+            c_weights = list()
+            for ds in data:
+                pred = program_to_evaluate.evaluate(data=ds)
+                if self.weights is not None:
+                    WMSE = (((pred - ds[self.target])**2)
+                            * ds[self.weights]).mean()
+                else:
+                    WMSE = ((pred - ds[self.target])**2).mean()
+                X.append(WMSE)
+                c_weights.append(len(ds[self.target]))
+            WMSE = self.mean_shift(X, c_weights, self.bandwidth)
+                
+            #all_data = pd.concat(data)
+            # pred = program_to_evaluate.evaluate(data=all_data)
+
+        if np.isnan(pred).any():
+            return np.inf
+
+        try:
+            k = len(program_to_evaluate.get_constants())
+
+            #if self.weights is not None:
+            #    WMSE = (((pred - all_data[self.target])**2)
+            #            * all_data[self.weights]).mean()
+            #else:
+            #    WMSE = ((pred - all_data[self.target])**2).mean()
+
+            #NLL = len(data[self.target]) / 2 * (1 + np.log(WMSE))
+
+            BIC = (1 + np.log(WMSE) + np.log(2*np.pi))*self.n0 + (np.log(self.n0) * k) 
+            return BIC
+
+        except TypeError:
+            return np.inf
+        except ValueError:
+            return np.inf
+        except NameError:
+            return np.inf
+
+
+
+
 class RegressionMinimumDescriptionLength(BaseFitness):
 
     def __init__(self, **kwargs) -> None:
